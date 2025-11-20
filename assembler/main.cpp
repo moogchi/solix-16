@@ -129,10 +129,7 @@ private:
   }
 
   uint16_t encodeIType(uint8_t opcode, uint8_t rd, uint8_t imm) {
-    if (imm > 255) {
-      throw runtime_error("Immediate value out of range (0-255): " +
-                          to_string(imm));
-    }
+    // imm is already validated to be <= 255 by caller
     return ((opcode & 0xF) << 12) | ((rd & 0xF) << 8) | (imm & 0xFF);
   }
 
@@ -282,7 +279,12 @@ private:
         throw runtime_error("MOV requires 2 operands");
       }
       uint8_t rd = parseRegister(operands[0]);
-      uint8_t imm = parseImmediate(operands[1]);
+      uint16_t imm16 = parseImmediate(operands[1]);
+      if (imm16 > 255) {
+        throw runtime_error("Immediate value out of range (0-255): " +
+                            to_string(imm16));
+      }
+      uint8_t imm = static_cast<uint8_t>(imm16);
       return encodeIType(instr.opcode, rd, imm);
     }
 
@@ -359,7 +361,7 @@ public:
         continue;
 
       try {
-        uint16_t machineInstr = assembleInstruction(lines[lineNum], address);
+        uint16_t machineInstr = assembleInstruction(cleaned, address);
         machineCode.push_back(machineInstr);
         address++;
       } catch (const exception &e) {

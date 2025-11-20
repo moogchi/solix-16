@@ -1,59 +1,117 @@
-; Solix-16 Test Program
-; Tests arithmetic, logic, memory, and control flow
+; ============================================================
+;                 SOLIX16 FULL ISA TORTURE TEST
+;    Covers:
+;      - All R-type (ADD, SUB, AND, OR, XOR, NOT, SHL, SHR)
+;      - All I-type (MOV)
+;      - All J-type (JMP, JZ, JNZ)
+;      - System (HLT)
+;      - Registers r0–r7, sp, pc, flags
+;      - Immediates: decimal, hex, binary, min/max
+;      - LD/ST with different register combos
+;      - Nested labels, forward/backward jumps
+; ============================================================
 
-; ===== Initialization =====
-    MOV r1, 15          ; r1 = 15
-    MOV r2, 10          ; r2 = 10
-    MOV r3, 0           ; r3 = 0 (accumulator)
+; =============================
+; Register Init + Immediate Tests
+; =============================
 
-; ===== Arithmetic Test =====
-    ADD r3, r1, r2      ; r3 = 15 + 10 = 25
-    SUB r4, r3, r2      ; r4 = 25 - 10 = 15
+START:
+    MOV r1, 0          ; zero
+    MOV r2, 1          ; one
+    MOV r3, 255        ; max 8-bit immediate
+    MOV r4, 0xAA       ; hex immediate
+    MOV r5, 0b101010   ; binary immediate (42)
+    MOV r6, 127        ; mid value
+    MOV r7, 0b11111111 ; another max (255)
 
-; ===== Logic Test =====
-    MOV r5, 0xAA        ; r5 = 0b10101010
-    MOV r6, 0x55        ; r6 = 0b01010101
-    AND r7, r5, r6      ; r7 = 0 (no bits overlap)
-    OR  r7, r5, r6      ; r7 = 0xFF (all bits set)
-    XOR r7, r5, r6      ; r7 = 0xFF (all bits flip)
-    NOT r7, r5          ; r7 = ~0xAA = 0x55
+; =============================
+; Arithmetic Tests
+; =============================
 
-; ===== Shift Test =====
-    MOV r1, 8           ; r1 = 8 = 0b00001000
-    SHL r1, r1          ; r1 = 16 = 0b00010000
-    SHR r1, r1          ; r1 = 8 = 0b00001000
+    ADD r1, r2, r3     ; r1 = 1 + 255 = 256 (truncates to 16-bit ALU)
+    SUB r4, r3, r2     ; r4 = 255 - 1
+    AND r5, r3, r4     ; AND test
+    OR  r6, r4, r2     ; OR test
+    XOR r7, r3, r4     ; XOR test
 
-; ===== Memory Test =====
-    MOV r1, 100         ; Memory address
-    MOV r2, 42          ; Data to store
-    ST  r1, r2          ; MEM[100] = 42
-    MOV r3, 0           ; Clear r3
-    LD  r3, r1          ; r3 = MEM[100] = 42
+; =============================
+; Unary Tests (NOT / SHL / SHR)
+; =============================
 
-; ===== Loop Test: Sum 1+2+3+4+5 =====
-    MOV r1, 0           ; Sum accumulator
-    MOV r2, 5           ; Counter (count down from 5)
-    MOV r3, 1           ; Decrement value
+    NOT r1, r1         ; invert
+    SHL r2, r2         ; << 1
+    SHR r3, r3         ; >> 1
 
-loop_start:
-    ADD r1, r1, r2      ; sum += counter
-    SUB r2, r2, r3      ; counter--
-    JNZ loop_start      ; if counter != 0, loop
-    ; r1 should now equal 15 (1+2+3+4+5)
+; =============================
+; Load/Store Tests
+; NOTE: The CPU must treat rX as addresses; this is legal for your ISA.
+; =============================
 
-; ===== Conditional Jump Test =====
-    MOV r4, 10          ; r4 = 10
-    MOV r5, 10          ; r5 = 10
-    SUB r6, r4, r5      ; r6 = 0, sets Z flag
-    JZ  zero_flag_set   ; Should jump
-    MOV r7, 99          ; Should NOT execute
-    
-zero_flag_set:
-    MOV r7, 77          ; Should execute, r7 = 77
+    MOV r0, 100        ; Base memory address to test LD/ST
+    MOV r1, 77         ; Data to store
 
-; ===== Test Jump =====
-    JMP end_program     ; Jump over next instruction
-    MOV r1, 255         ; Should NOT execute
+    ST r0, r1          ; MEM[100] = 77
+    LD r2, r0          ; Load it back → r2 = 77
 
-end_program:
-    HLT                 ; Stop execution
+; Test with different registers
+    MOV r3, 200
+    MOV r4, 0x55
+    ST r3, r4
+    LD r5, r3          ; Expect 0x55
+
+; =============================
+; Branch Tests (Forward + Backward)
+; =============================
+
+    MOV r6, 3
+
+LOOP_TOP:
+    SUB r6, r6, r2     ; r6 -= r2 (r2 = 77 so it will underflow)
+    JZ EXIT            ; if zero → exit loop
+    JNZ LOOP_TOP       ; always true, ensures backward jump
+
+EXIT:
+    MOV r7, 0x10       ; mark exit
+
+; =============================
+; Specific Jump Address Test
+; (Jump to raw numeric address instead of label)
+; =============================
+
+    JMP 12             ; Jump directly to instruction address 12
+
+; =============================
+; Label at target numeric address 12
+; (Depending on how assembler offsets work, this is reachable)
+; =============================
+
+ADDR12:
+    MOV r1, 0x5A       ; check if JMP numeric landed here
+
+; =============================
+; Zero Flag Branch Tests
+; =============================
+
+    MOV r2, 0
+    JZ ZERO_HIT
+    MOV r3, 123        ; this should get skipped
+
+ZERO_HIT:
+    MOV r4, 0xF0
+
+; =============================
+; Non-zero Branch Test
+; =============================
+
+    MOV r5, 1
+    JNZ NONZERO_HIT
+    MOV r6, 99         ; skipped (this line should not execute)
+
+NONZERO_HIT:
+    MOV r7, 0x33
+
+; =============================
+; Final Instruction
+; =============================
+
+    HLT

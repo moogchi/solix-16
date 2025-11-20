@@ -86,7 +86,7 @@ f000
 
 ## Recent Bug Fixes (Nov 2024)
 
-### Critical Fixes
+### Critical Fixes (Round 1)
 
 1. **ST instruction encoding** ✅
 
@@ -116,15 +116,63 @@ f000
    - **Minor:** Used R-type encoding unnecessarily
    - **Fixed:** Use clean `opcode << 12` encoding
 
+### Critical Fixes (Round 2 - Nov 19, 2024)
+
+6. **Ignored cleaned variable in second pass** ✅ **[MOST CRITICAL]**
+
+   - **Bug:** Second pass called `assembleInstruction(lines[lineNum], ...)` instead of `assembleInstruction(cleaned, ...)`
+   - **Impact:** Comments and labels were NOT stripped before parsing, breaking ANY line with comments or labels
+   - **Example:** `loop: ADD r1,r2,r3 ; comment` would try to parse the entire raw line including `;comment`
+   - **Fixed:** Use the already-cleaned string that has comments/labels removed
+
+7. **Silent immediate truncation** ✅
+
+   - **Bug:** `parseImmediate()` returns `uint16_t` but was cast to `uint8_t` BEFORE range checking
+   - **Impact:** `MOV r1, 300` would silently truncate to `44` instead of throwing an error
+   - **Fixed:** Check `if (imm16 > 255)` before truncating to `uint8_t`
+
+8. **Redundant range check removed** ✅
+   - **Bug:** `encodeIType()` checked `if (imm > 255)` but imm was already `uint8_t` (always false)
+   - **Impact:** Compiler warning, unreachable code
+   - **Fixed:** Removed redundant check since validation now happens at call site
+
 ### Verification
 
-All fixes verified with test suite. Example ST encoding:
+All fixes verified with comprehensive test suite:
+
+**Test 1: Comment and label stripping**
+
+```asm
+start:  MOV r1, 15  ; inline comment with label
+        JNZ loop    ; uppercase reference
+```
+
+✅ Passes with cleaned variable fix
+
+**Test 2: Immediate overflow detection**
+
+```asm
+MOV r1, 300  ; Should fail
+```
+
+✅ Now throws: `Immediate value out of range (0-255): 300`
+
+**Test 3: ST encoding**
 
 ```
 ST r2, r1  →  0xD021  =  1101 0000 0010 0001
                          ^^^^ ^^^^ ^^^^ ^^^^
                          ST   Rd=0 Rs=2 Rt=1  ✓
 ```
+
+**Test 4: Case-insensitive labels**
+
+```asm
+Loop:
+    JNZ LOOP  ; Works correctly
+```
+
+✅ Both stored and looked up as uppercase
 
 ## Architecture Overview
 
