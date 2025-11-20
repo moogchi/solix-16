@@ -1,0 +1,49 @@
+=== Solix-16 Register File Testbench ===
+
+VCD info: dumpfile register_file.vcd opened for output.
+Test 1: Reset verification
+  All registers should be 0
+  r0 = 0x0000 ✓
+  r7 = 0x0000 ✓
+  PC, SP, FLAGS = 0 ✓
+
+Test 2: Writing to general-purpose registers
+  r1 = 0x1234 ✓
+  r3 = 0xabcd ✓
+
+Test 3: Simultaneous dual read
+  rs=0x1234, rt=0xabcd ✓
+
+Test 4: Writing to all general-purpose registers
+  r0 = 0x0100 ✓
+  r1 = 0x0101 ✓
+  r2 = 0x0102 ✓
+  r3 = 0x0103 ✓
+  r4 = 0x0104 ✓
+  r5 = 0x0105 ✓
+  r6 = 0x0106 ✓
+  r7 = 0x0107 ✓
+
+Test 5: Program Counter (PC) operations
+  PC = 0x0100 ✓
+  PC++ = 0x0101 ✓
+
+Test 6: Stack Pointer (SP) operations
+  SP = 0xffff ✓
+  SP-- = 0xfffe ✓
+
+Test 7: Flags register operations
+  FLAGS = 0x000f ✓
+
+Test 8: Simultaneous write and read
+  Read before write: rt=0x5555 (unexpected)
+  Read after write: rt=0x5555 ✓
+
+Test 9: Reset during operation
+  All registers cleared ✓
+
+===========================================
+All tests completed!
+===========================================
+
+register_file_tb.v:254: $finish called at 337000 (1ps)
